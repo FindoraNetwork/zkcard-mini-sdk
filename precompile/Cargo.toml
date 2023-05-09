@@ -1,8 +1,30 @@
 [package]
-name = "zkcard_precompile"
+name = "zkcard_precom_contract"
 version = "0.1.0"
+authors = ["FindoraNetwork"]
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+homepage = "https://findora.org/technology"
+repository = "https://github.com/findoranetwork/platform/"
+description = "ZKCARD precompiles for EVM module."
+readme = "README.md"
 
 [dependencies]
+evm-precompile-utils = { git = "http://github.com/FindoraNetwork/platform.git", branch = "new-zkcard-precom-contract" }
+module-evm = { git = "http://github.com/FindoraNetwork/platform.git", branch = "new-zkcard-precom-contract" }
+
+ethereum-types = { version = "0.13.1", default-features = false }
+evm = { version = "0.35.0", default-features = false, features = ["with-serde"] }
+tracing = "0.1"
+num_enum = { version = "0.5.4", default-features = false }
+slices = "0.2.0"
+
+num = { version = "0.3", features = ["alloc"] }
+barnett-smart-card-protocol = { git = "https://github.com/FindoraNetwork/findora-poker.git", branch = "add_only_function" }
+proof-essentials = { git = "https://github.com/FindoraNetwork/findora-poker.git", branch = "add_only_function" }
+rand = "0.8"
+
+ark-std = { version = "0.4.0", features = ["std"] }
+ark-ec = "0.4.0"
+ark-serialize = "0.4.0"
+ark-ff = "0.4.0"
+ark-bn254 = "0.4.0"

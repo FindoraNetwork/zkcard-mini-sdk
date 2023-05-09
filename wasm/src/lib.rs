@@ -19,6 +19,7 @@ use barnett_smart_card_protocol::{
     },
     BarnettSmartProtocol,
 };
+use proof_essentials::zkp::proofs::schnorr_identification::proof::Proof as InKeyownershipProof;
 use proof_essentials::{
     homomorphic_encryption::el_gamal::{ElGamal, Plaintext},
     utils::{permutation::Permutation as CPermutation, rand::sample_vector},
@@ -43,6 +44,7 @@ type CAggregatePublicKey = G1Affine;
 type CScalar = Fr;
 type CShuffleProof = InShuffleProof<Fr, ElGamal<CCurve>, PedersenCommitment<CCurve>>;
 type CCard = Plaintext<CProjective<CConfig>>;
+type CKeyownershipProof = InKeyownershipProof<CCurve>;
 
 #[derive(PartialEq, Clone, Copy, Eq)]
 pub enum Suite {
@@ -91,16 +93,32 @@ pub fn setup(m: usize, n: usize) -> Result<CardParameters, JsValue> {
 }
 
 // Generate a game key pair
+// @param {string} name - Player name
 // @returns [PublicKey, SecretKey]
 #[wasm_bindgen]
-pub fn keygen(pp: &CardParameters) -> Result<GameKey, JsValue> {
+pub fn keygen(pp: &CardParameters, name: String) -> Result<GameKeyAndProof, JsValue> {
     let rng = &mut thread_rng();
-    CCardProtocol::player_keygen(rng, &pp.v)
+    let v = match CCardProtocol::player_keygen(rng, &pp.v) {
+        Ok(v) => {
+            console::log_1(&"keygen success".to_string().into());
+            v
+        }
+        Err(e) => {
+            console::log_1(&format!("keygen error: {:?}", e).into());
+            return Err(JsValue::from_str(&e.to_string()));
+        }
+    };
+
+    let pubKey = PublicKey { v: v.0 };
+    let secKey = SecretKey { v: v.1 };
+
+    CCardProtocol::prove_key_ownership(rng, &pp.v, &v.0, &v.1, &name.as_bytes().to_owned())
         .map(|v| {
             console::log_1(&"keygen success".to_string().into());
-            GameKey {
-                pubKey: PublicKey { v: v.0 },
-                secKey: SecretKey { v: v.1 },
+            GameKeyAndProof {
+                pubKey: pubKey,
+                secKey: secKey,
+                keyownershipProof: KeyownershipProof { v },
             }
         })
         .map_err(|e| {
@@ -286,12 +304,13 @@ pub struct SecretKey {
 
 // A game public key and secret key
 #[wasm_bindgen]
-pub struct GameKey {
+pub struct GameKeyAndProof {
     pubKey: PublicKey,
     secKey: SecretKey,
+    keyownershipProof: KeyownershipProof,
 }
 #[wasm_bindgen]
-impl GameKey {
+impl GameKeyAndProof {
     #[wasm_bindgen(js_name = getPubKey)]
     pub fn getPubKey(&self) -> PublicKey {
         return self.pubKey.clone();
@@ -299,6 +318,10 @@ impl GameKey {
     #[wasm_bindgen(js_name = getSecKey)]
     pub fn getSecKey(&self) -> SecretKey {
         return self.secKey.clone();
+    }
+    #[wasm_bindgen(js_name = getProof)]
+    pub fn getProof(&self) -> KeyownershipProof {
+        return self.keyownershipProof.clone();
     }
 }
 
@@ -404,4 +427,7 @@ pub struct ShuffleProof {
 
 // Zero-knowledge proof of game key ownership
 #[wasm_bindgen]
-pub struct ProofKeyownership {}
+#[derive(Clone)]
+pub struct KeyownershipProof {
+    v: CKeyownershipProof,
+}
