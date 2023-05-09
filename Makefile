@@ -1,13 +1,13 @@
-all: wasm_debug
+all: build wasm_release
 
 WASM_PKG = wasm.tar.gz
 lib_files = ./$(WASM_PKG)
 
 wasm_debug:
-	cd wasm && wasm-pack build
+	cd wasm && wasm-pack build --profiling
 
 wasm_release:
-	cd wasm && wasm-pack build --release
+	cd wasm && wasm-pack build
 
 wasm_pack:
 	- tar -zcpf $(WASM_PKG) wasm/pkg

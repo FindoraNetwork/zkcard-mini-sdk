@@ -1,12 +1,16 @@
 [package]
 name = "zkcard_wasm"
 version = "0.1.0"
+authors = ["FindoraNetwork"]
 edition = "2021"
+homepage = "https://findora.org/technology"
+repository = "https://github.com/findoranetwork/platform/"
+description = "ZKCARD wasm for EVM module."
+readme = "README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 
 [dependencies]
@@ -17,10 +21,10 @@ web-sys = { version = "0.3.61", features =  ["console"] }
 
 
 serde = { version = "1.0.162", features = ["derive"]}
-rand = "0.8"
 num = { version = "0.3", features = ["alloc"] }
 num_enum = { version = "0.5.4", default-features = false }
 slices = "0.2.0"
+rand = "0.8"
 
 
 barnett-smart-card-protocol = { git = "https://github.com/FindoraNetwork/findora-poker.git", branch = "add_only_function" }
