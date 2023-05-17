@@ -93,12 +93,13 @@ pub fn setup(m: usize, n: usize) -> Result<CardParameters, JsValue> {
 }
 
 // Generate a game key pair
+// @param {CardParameters} parameters - The public parameters of the game
 // @param {string} name - Player name
 // @returns [PublicKey, SecretKey]
 #[wasm_bindgen]
-pub fn keygen(pp: &CardParameters, name: String) -> Result<GameKeyAndProof, JsValue> {
+pub fn keygen(parameters: &CardParameters, name: String) -> Result<GameKeyAndProof, JsValue> {
     let rng = &mut thread_rng();
-    let v = match CCardProtocol::player_keygen(rng, &pp.v) {
+    let v = match CCardProtocol::player_keygen(rng, &parameters.v) {
         Ok(v) => {
             console::log_1(&"keygen success".to_string().into());
             v
@@ -112,7 +113,7 @@ pub fn keygen(pp: &CardParameters, name: String) -> Result<GameKeyAndProof, JsVa
     let pubKey = PublicKey { v: v.0 };
     let secKey = SecretKey { v: v.1 };
 
-    CCardProtocol::prove_key_ownership(rng, &pp.v, &v.0, &v.1, &name.as_bytes().to_owned())
+    CCardProtocol::prove_key_ownership(rng, &parameters.v, &v.0, &v.1, &name.as_bytes().to_owned())
         .map(|v| {
             console::log_1(&"keygen success".to_string().into());
             GameKeyAndProof {
@@ -168,7 +169,7 @@ pub fn shuffleAndRemask(
     sharedKey: &AggregatePublicKey,
     deck: &VMaskedCard,
     permutation: &Permutation,
-) -> Result<MaskedCardAndShuffleProof, JsValue> {
+) -> Result<MaskedCardsAndShuffleProof, JsValue> {
     let rng = &mut thread_rng();
     let deck: Vec<CMaskedCard> = deck.v.iter().map(|v| v.v).collect();
     let masking_factors: Vec<CScalar> = sample_vector(rng, deck.len());
@@ -186,7 +187,7 @@ pub fn shuffleAndRemask(
         let deck: Vec<MaskedCard> = v.0.iter().map(|v| MaskedCard { v: v.clone() }).collect();
         let vdeck = VMaskedCard { v: deck };
         let shuffleProof = ShuffleProof { v: v.1 };
-        MaskedCardAndShuffleProof {
+        MaskedCardsAndShuffleProof {
             vmaskedCard: vdeck,
             shuffleProof,
         }
@@ -358,15 +359,15 @@ pub struct VMaskedCard {
 }
 
 #[wasm_bindgen]
-pub struct MaskedCardAndShuffleProof {
+pub struct MaskedCardsAndShuffleProof {
     vmaskedCard: VMaskedCard,
     shuffleProof: ShuffleProof,
 }
 
 #[wasm_bindgen]
-impl MaskedCardAndShuffleProof {
-    #[wasm_bindgen(js_name = getMaskedCard)]
-    pub fn getMaskedCard(&self) -> VMaskedCard {
+impl MaskedCardsAndShuffleProof {
+    #[wasm_bindgen(js_name = getMaskedCards)]
+    pub fn getMaskedCards(&self) -> VMaskedCard {
         self.vmaskedCard.clone()
     }
     #[wasm_bindgen(js_name = getShuffleProof)]
