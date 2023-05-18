@@ -46,6 +46,34 @@ type CShuffleProof = InShuffleProof<Fr, ElGamal<CCurve>, PedersenCommitment<CCur
 type CCard = Plaintext<CProjective<CConfig>>;
 type CKeyownershipProof = InKeyownershipProof<CCurve>;
 
+#[derive(PartialEq, Clone, Copy, Eq)]
+pub enum Suite {
+    Greet,
+    Poison,
+}
+
+#[derive(PartialEq, Clone, Eq, Copy)]
+pub struct MurderCard {
+    suite: Suite,
+}
+
+impl MurderCard {
+    pub fn new(suite: Suite) -> Self {
+        Self { suite }
+    }
+}
+
+impl std::fmt::Debug for MurderCard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let suite = match self.suite {
+            Suite::Greet => "G",
+            Suite::Poison => "P",
+        };
+
+        write!(f, "{}", suite)
+    }
+}
+
 // Generate a public parameter to setup game instance
 // @param {number] m- deck size in 1st dimension
 // @param {number] n - deck size in 2nd dimension
@@ -65,7 +93,6 @@ pub fn setup(m: usize, n: usize) -> Result<CardParameters, JsValue> {
 }
 
 // Generate a game key pair
-// @param {CardParameters} parameters - The public parameters of the game
 // @param {string} name - Player name
 // @returns [PublicKey, SecretKey]
 #[wasm_bindgen]
@@ -222,6 +249,7 @@ pub fn reveal(revealTokens: VRevealToken, masked: &MaskedCard) -> Result<Card, J
 // Generate `num' of encoded cards
 // @param {number] num - deck size
 // @returns Card[]
+#[wasm_bindgen]
 pub fn encodeCards(num: usize) -> VCard {
     let rng = &mut thread_rng();
 

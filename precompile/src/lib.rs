@@ -1,14 +1,15 @@
 #![allow(non_upper_case_globals)]
 
-use ethereum_types::{H160, U256};
+use eth_utils::fp_evm::{Precompile, PrecompileHandle, PrecompileResult};
+use ethereum_types::U256;
 use evm::{
+    backend::Log,
     executor::stack::{PrecompileFailure, PrecompileOutput},
-    Context, ExitSucceed,
+    ExitSucceed,
 };
 use evm_precompile_utils::{
     error, AsVec, Bytes, EvmDataReader2, EvmDataWriter2, EvmResult, Gasometer, ToBytes,
 };
-use module_evm::precompile::{FinState, Precompile, PrecompileId, PrecompileResult};
 use num::Zero;
 use slices::u8_slice;
 use std::vec;
@@ -45,8 +46,6 @@ type CAggregatePublicKey = ark_bn254::G1Affine;
 type CRevealProof = InRevealProof<CCurve>;
 type CShuffleProof = InShuffleProof<ark_bn254::Fr, ElGamal<CCurve>, PedersenCommitment<CCurve>>;
 type CKeypProof = InKeypProof<CProjective<CConfig>>;
-
-const disable_delegate_zkcard: i64 = 50000000;
 
 /// ZkCard transfer event selector, Keccak256("Transfer(address,address,uint256)")
 ///
@@ -85,12 +84,6 @@ const GAS_TEST: u64 = 1000;
 
 pub struct ZkCard;
 
-impl PrecompileId for ZkCard {
-    fn contract_id() -> u64 {
-        0x3000
-    }
-}
-
 #[evm_precompile_utils::generate_function_selector]
 #[derive(Debug, PartialEq, Eq, num_enum::TryFromPrimitive, num_enum::IntoPrimitive)]
 pub enum Call {
@@ -103,23 +96,12 @@ pub enum Call {
 }
 
 impl Precompile for ZkCard {
-    fn execute(
-        input: &[u8],
-        target_gas: Option<u64>,
-        context: &Context,
-        state: &FinState,
-    ) -> PrecompileResult {
-        if disable_delegate_zkcard < state.header.height {
-            let addr = context.address;
-            if addr != H160::from_low_u64_be(Self::contract_id()) {
-                return Err(PrecompileFailure::Error {
-                    exit_status: error("No delegatecall support"),
-                });
-            }
-        }
+    fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
+        let input = handle.input();
+        let target_gas = handle.gas_limit();
+        let _context = handle.context();
 
         let mut input = EvmDataReader2::new(input);
-
         let selector = match input.read_selector::<Call>() {
             Ok(v) => v,
             Err(e) => {
@@ -127,37 +109,33 @@ impl Precompile for ZkCard {
             }
         };
 
-        match &selector {
-            Call::VerifyKeyOwnership => match Self::verify_key_ownership(input, target_gas) {
-                Ok(v) => Ok(v),
-                Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
+        match {
+            match &selector {
+                Call::VerifyKeyOwnership => Self::verify_key_ownership(input, target_gas),
+                Call::ComputeAggregateKey => Self::compute_aggregate_key(input, target_gas),
+                Call::VerifyShuffle => Self::verify_shuffle(input, target_gas),
+                Call::VerifyReveal => Self::verify_reveal(input, target_gas),
+                Call::Reveal => Self::reveal(input, target_gas),
+                Call::Test => Self::test(input, target_gas),
+            }
+        } {
+            Ok(v) => {
+                handle.record_cost(v.1)?;
+                for log in v.2 {
+                    handle.log(log.address, log.topics, log.data)?;
+                }
+                Ok(v.0)
             },
-            Call::ComputeAggregateKey => match Self::compute_aggregate_key(input, target_gas) {
-                Ok(v) => Ok(v),
-                Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
-            },
-            Call::VerifyShuffle => match Self::verify_shuffle(input, target_gas) {
-                Ok(v) => Ok(v),
-                Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
-            },
-            Call::VerifyReveal => match Self::verify_reveal(input, target_gas) {
-                Ok(v) => Ok(v),
-                Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
-            },
-            Call::Reveal => match Self::reveal(input, target_gas) {
-                Ok(v) => Ok(v),
-                Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
-            },
-            Call::Test => match Self::test(input, target_gas) {
-                Ok(v) => Ok(v),
-                Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
-            },
+            Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
         }
     }
 }
 
 impl ZkCard {
-    fn test(mut input: EvmDataReader2, target_gas: Option<u64>) -> EvmResult<PrecompileOutput> {
+    fn test(
+        mut input: EvmDataReader2,
+        target_gas: Option<u64>,
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
         debug!(target: "evm", "ZkCard#name: Findora");
 
         let mut gasometer = Gasometer::new(target_gas);
@@ -168,18 +146,23 @@ impl ZkCard {
 
         let res: Bytes = b"call test".to_bytes();
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: gasometer.used_gas(),
-            output: EvmDataWriter2::new().write(res).build(),
-            logs: vec![],
-        })
+        let cost = gasometer.used_gas();
+        let logs = vec![];
+
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
     }
 
     fn verify_key_ownership(
         mut input: EvmDataReader2,
         target_gas: Option<u64>,
-    ) -> EvmResult<PrecompileOutput> {
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
         debug!(target: "evm", "ZkCard#name: Findora");
 
         let mut gasometer = Gasometer::new(target_gas);
@@ -208,23 +191,25 @@ impl ZkCard {
             Ok(v) => v,
             Err(e) => return Err(error(format!("key_proof error: {:?}", e))),
         };
-        let res = match CCardProtocol::verify_key_ownership(&params, &pub_key, &memo, &key_proof) {
-            Ok(_) => true,
-            Err(_) => false,
-        };
+        let res = CCardProtocol::verify_key_ownership(&params, &pub_key, &memo, &key_proof).is_ok();
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: gasometer.used_gas(),
-            output: EvmDataWriter2::new().write(res).build(),
-            logs: vec![],
-        })
+        let cost = gasometer.used_gas();
+        let logs = vec![];
+
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
     }
 
     fn compute_aggregate_key(
         mut input: EvmDataReader2,
         target_gas: Option<u64>,
-    ) -> EvmResult<PrecompileOutput> {
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
         let mut gasometer = Gasometer::new(target_gas);
         gasometer.record_cost(GAS_COMPUTEAGGREGATEKEY)?;
 
@@ -250,18 +235,23 @@ impl ZkCard {
 
         let res: Bytes = res.to_bytes();
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: gasometer.used_gas(),
-            output: EvmDataWriter2::new().write(res).build(),
-            logs: vec![],
-        })
+        let cost = gasometer.used_gas();
+        let logs = vec![];
+
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
     }
 
     fn verify_shuffle(
         mut input: EvmDataReader2,
         target_gas: Option<u64>,
-    ) -> EvmResult<PrecompileOutput> {
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
         let mut gasometer = Gasometer::new(target_gas);
         gasometer.record_cost(GAS_VERIFYSHUFFLE)?;
 
@@ -307,29 +297,31 @@ impl ZkCard {
                 Err(e) => return Err(error(format!("shuffle_proof error: {:?}", e))),
             };
 
-        let res = match CCardProtocol::verify_shuffle(
+        let res = CCardProtocol::verify_shuffle(
             &params,
             &shared_key,
             &cur_decks2,
             &new_decks2,
             &shuffle_proof,
-        ) {
-            Ok(_) => true,
-            Err(_) => false,
-        };
+        )
+        .is_ok();
+        let cost = gasometer.used_gas();
+        let logs = vec![];
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: gasometer.used_gas(),
-            output: EvmDataWriter2::new().write(res).build(),
-            logs: vec![],
-        })
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
     }
 
     fn verify_reveal(
         mut input: EvmDataReader2,
         target_gas: Option<u64>,
-    ) -> EvmResult<PrecompileOutput> {
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
         let mut gasometer = Gasometer::new(target_gas);
         gasometer.record_cost(GAS_VERIFYREVEAL)?;
 
@@ -367,26 +359,27 @@ impl ZkCard {
                 Err(e) => return Err(error(format!("reveal_proof error: {:?}", e))),
             };
 
-        let res = match CCardProtocol::verify_reveal(
-            &params,
-            &pub_key,
-            &reveal_token,
-            &masked,
-            &reveal_proof,
-        ) {
-            Ok(_) => true,
-            Err(_) => false,
-        };
+        let res =
+            CCardProtocol::verify_reveal(&params, &pub_key, &reveal_token, &masked, &reveal_proof)
+                .is_ok();
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: gasometer.used_gas(),
-            output: EvmDataWriter2::new().write(res).build(),
-            logs: vec![],
-        })
+        let cost = gasometer.used_gas();
+        let logs = vec![];
+
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
     }
 
-    fn reveal(mut input: EvmDataReader2, target_gas: Option<u64>) -> EvmResult<PrecompileOutput> {
+    fn reveal(
+        mut input: EvmDataReader2,
+        target_gas: Option<u64>,
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
         let mut gasometer = Gasometer::new(target_gas);
         gasometer.record_cost(GAS_REVEAL)?;
 
@@ -401,7 +394,9 @@ impl ZkCard {
             let reveal_token: CRevealToken =
                 match CanonicalDeserialize::deserialize_compressed(reveal_token.as_slice()) {
                     Ok(v) => v,
-                    Err(e) => return Err(error(format!("reveal_tokens error: {:?}", e))),
+                    Err(e) => {
+                        return Err(error(format!("reveal_tokens error: {:?}", e)));
+                    }
                 };
             aggregate_reveal_token = aggregate_reveal_token + reveal_token;
         }
@@ -424,11 +419,16 @@ impl ZkCard {
 
         let res: Bytes = res.to_bytes();
 
-        Ok(PrecompileOutput {
-            exit_status: ExitSucceed::Returned,
-            cost: gasometer.used_gas(),
-            output: EvmDataWriter2::new().write(res).build(),
-            logs: vec![],
-        })
+        let cost = gasometer.used_gas();
+        let logs = vec![];
+
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
     }
 }

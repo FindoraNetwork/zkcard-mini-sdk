@@ -1,4 +1,4 @@
-all: wasm_release
+all: build wasm_release
 
 WASM_PKG = wasm.tar.gz
 lib_files = ./$(WASM_PKG)
