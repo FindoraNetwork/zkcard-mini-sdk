@@ -125,7 +125,7 @@ impl Precompile for ZkCard {
                     handle.log(log.address, log.topics, log.data)?;
                 }
                 Ok(v.0)
-            },
+            }
             Err(e) => Err(PrecompileFailure::Error { exit_status: e }),
         }
     }

@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use ark_serialize::CanonicalDeserialize;
+use ark_serialize::CanonicalSerialize;
 use ark_std::{UniformRand, Zero};
 use barnett_smart_card_protocol::Reveal;
 use wasm_bindgen::prelude::*;
@@ -303,6 +305,13 @@ pub struct SecretKey {
     v: CSecretKey,
 }
 
+// Zero-knowledge proof of game key ownership
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct KeyownershipProof {
+    v: CKeyownershipProof,
+}
+
 // A game public key and secret key
 #[wasm_bindgen]
 pub struct GameKeyAndProof {
@@ -310,6 +319,7 @@ pub struct GameKeyAndProof {
     secKey: SecretKey,
     keyownershipProof: KeyownershipProof,
 }
+
 #[wasm_bindgen]
 impl GameKeyAndProof {
     #[wasm_bindgen(js_name = getPubKey)]
@@ -345,7 +355,20 @@ pub struct VCard {
     v: Vec<Card>,
 }
 
-// // A masked card
+#[wasm_bindgen]
+impl VCard {
+    #[wasm_bindgen]
+    pub fn newVCard() -> Self {
+        return Self { v: Vec::new() };
+    }
+
+    #[wasm_bindgen]
+    pub fn push(&mut self, d: &Card) {
+        self.v.push(d.clone());
+    }
+}
+
+// A masked card
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct MaskedCard {
@@ -356,6 +379,25 @@ pub struct MaskedCard {
 #[derive(Clone)]
 pub struct VMaskedCard {
     v: Vec<MaskedCard>,
+}
+
+#[wasm_bindgen]
+impl VMaskedCard {
+    #[wasm_bindgen]
+    pub fn newVMaskedCard() -> Self {
+        return Self { v: Vec::new() };
+    }
+
+    #[wasm_bindgen]
+    pub fn push(&mut self, d: &MaskedCard) {
+        self.v.push(d.clone());
+    }
+}
+
+// Zero-knowledge proof of deck shuffling
+#[wasm_bindgen]
+pub struct ShuffleProof {
+    v: CShuffleProof,
 }
 
 #[wasm_bindgen]
@@ -389,6 +431,18 @@ pub struct VRevealToken {
     v: Vec<RevealToken>,
 }
 
+#[wasm_bindgen]
+impl VRevealToken {
+    fn newVRevealToken() -> Self {
+        return Self { v: Vec::new() };
+    }
+
+    #[wasm_bindgen]
+    pub fn push(&mut self, d: &RevealToken) {
+        self.v.push(d.clone());
+    }
+}
+
 // Zero-knowledge proof of card reveal token
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -414,21 +468,188 @@ impl RevealTokenAndProof {
     }
 }
 
-// // A permutation for deck shuffling
+// A permutation for deck shuffling
 #[wasm_bindgen]
 pub struct Permutation {
     v: CPermutation,
 }
 
-// // Zero-knowledge proof of deck shuffling
 #[wasm_bindgen]
-pub struct ShuffleProof {
-    v: CShuffleProof,
+impl Permutation {
+    #[wasm_bindgen]
+    pub fn newPermutation(size: usize) -> Self {
+        let rng = &mut thread_rng();
+        let v = CPermutation::new(rng, size);
+        return Permutation { v };
+    }
 }
 
-// Zero-knowledge proof of game key ownership
 #[wasm_bindgen]
-#[derive(Clone)]
-pub struct KeyownershipProof {
-    v: CKeyownershipProof,
+impl CardParameters {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return CardParameters { v };
+    }
+}
+
+#[wasm_bindgen]
+impl PublicKey {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl SecretKey {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl KeyownershipProof {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl AggregatePublicKey {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl Card {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl MaskedCard {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl ShuffleProof {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl RevealToken {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
+}
+
+#[wasm_bindgen]
+impl RevealProof {
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> String {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v.serialize_compressed(&mut data).unwrap();
+        return base64::encode(data);
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Self {
+        let data = base64::decode(data).unwrap();
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
+        return Self { v };
+    }
 }
