@@ -143,9 +143,9 @@ pub fn keygen(
 #[wasm_bindgen]
 pub fn mask(
     cardrand: &mut CardRand,
-    parameters: CardParameters,
-    sharedKey: AggregatePublicKey,
-    encoded: Card,
+    parameters: &CardParameters,
+    sharedKey: &PublicKey,
+    encoded: &Card,
 ) -> Result<MaskedCard, JsValue> {
     let rng = &mut cardrand.v;
     CCardProtocol::mask(
@@ -175,7 +175,7 @@ pub fn mask(
 pub fn shuffleAndRemask(
     cardrand: &mut CardRand,
     parameters: &CardParameters,
-    sharedKey: &AggregatePublicKey,
+    sharedKey: &PublicKey,
     deck: &VMaskedCard,
     permutation: &Permutation,
 ) -> Result<MaskedCardsAndShuffleProof, JsValue> {
@@ -414,6 +414,21 @@ impl VMaskedCard {
     #[wasm_bindgen]
     pub fn push(&mut self, d: &MaskedCard) {
         self.v.push(d.clone());
+    }
+
+    #[wasm_bindgen]
+    pub fn pop(&mut self) -> MaskedCard {
+        self.v.pop().unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub fn reverse(&mut self) {
+        self.v.reverse();
+    }
+
+    #[wasm_bindgen]
+    pub fn len(&self) -> usize {
+        self.v.len()
     }
 }
 

@@ -242,6 +242,7 @@ impl ZkCard {
             Err(e) => return Err(error(format!("serialize error: {:?}", e))),
         };
 
+        let res = base64::encode(&res).into_bytes();
         let res: Bytes = res.to_bytes();
 
         let cost = gasometer.used_gas();
@@ -277,7 +278,7 @@ impl ZkCard {
                 Ok(v) => v,
                 Err(e) => return Err(error(format!("params error: {:?}", e))),
             };
-        let shared_key: CAggregatePublicKey =
+        let shared_key: CPublicKey =
             match CanonicalDeserialize::deserialize_compressed(shared_key.as_slice()) {
                 Ok(v) => v,
                 Err(e) => return Err(error(format!("shared_key error: {:?}", e))),
@@ -427,6 +428,7 @@ impl ZkCard {
             Err(e) => return Err(error(format!("serialize error: {:?}", e))),
         };
 
+        let res = base64::encode(&res).into_bytes();
         let res: Bytes = res.to_bytes();
 
         let cost = gasometer.used_gas();
