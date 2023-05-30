@@ -16,7 +16,11 @@ use std::vec;
 use tracing::debug;
 
 // zkcard support
-use ark_ec::{models::short_weierstrass::Affine, AffineRepr};
+use ark_bn254::{g1::Config, Fr, G1Affine, G1Projective};
+use ark_ec::{
+    models::short_weierstrass::{Affine, Projective},
+    AffineRepr,
+};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use barnett_smart_card_protocol::{
     discrete_log_cards::{
@@ -24,28 +28,30 @@ use barnett_smart_card_protocol::{
     },
     BarnettSmartProtocol, Reveal,
 };
-use proof_essentials::zkp::proofs::schnorr_identification::proof::Proof as InKeypProof;
 use proof_essentials::{
     homomorphic_encryption::el_gamal::ElGamal,
     vector_commitment::pedersen::PedersenCommitment,
     zkp::{
         arguments::shuffle::proof::Proof as InShuffleProof,
-        proofs::chaum_pedersen_dl_equality::proof::Proof as InRevealProof,
+        proofs::{
+            chaum_pedersen_dl_equality::proof::Proof as InRevealProof,
+            schnorr_identification::proof::Proof as InKeyownershipProof,
+        },
     },
 };
 
-type CConfig = ark_bn254::g1::Config;
-type CProjective<T> = ark_ec::models::short_weierstrass::Projective<T>;
-type CCurve = ark_bn254::G1Projective;
+type CConfig = Config;
+type CProjective<T> = Projective<T>;
+type CCurve = G1Projective;
 type CCardProtocol<'a> = DLCards<'a, CCurve>;
 type CParameters = Parameters<CProjective<CConfig>>;
 type CPublicKey = Affine<CConfig>;
 type CMaskedCard = InMaskedCard<CCurve>;
 type CRevealToken = InRevealToken<CCurve>;
-type CAggregatePublicKey = ark_bn254::G1Affine;
+type CAggregatePublicKey = G1Affine;
 type CRevealProof = InRevealProof<CCurve>;
-type CShuffleProof = InShuffleProof<ark_bn254::Fr, ElGamal<CCurve>, PedersenCommitment<CCurve>>;
-type CKeypProof = InKeypProof<CProjective<CConfig>>;
+type CShuffleProof = InShuffleProof<Fr, ElGamal<CCurve>, PedersenCommitment<CCurve>>;
+type CKeyownershipProof = InKeyownershipProof<CProjective<CConfig>>;
 
 /// ZkCard transfer event selector, Keccak256("Transfer(address,address,uint256)")
 ///
@@ -183,15 +189,18 @@ impl ZkCard {
             Ok(v) => v,
             Err(e) => return Err(error(format!("pub_key error: {:?}", e))),
         };
-        let memo: Vec<u8> = match Vec::<u8>::deserialize_compressed(memo.as_slice()) {
-            Ok(v) => v,
-            Err(e) => return Err(error(format!("memo error: {:?}", e))),
-        };
-        let key_proof: CKeypProof = match CKeypProof::deserialize_compressed(key_proof.as_slice()) {
-            Ok(v) => v,
-            Err(e) => return Err(error(format!("key_proof error: {:?}", e))),
-        };
-        let res = CCardProtocol::verify_key_ownership(&params, &pub_key, &memo, &key_proof).is_ok();
+        // let memo: Vec<u8> = match Vec::<u8>::deserialize_compressed(memo.as_slice()) {
+        //     Ok(v) => v,
+        //     Err(e) => return Err(error(format!("memo error: {:?}", e))),
+        // };
+        let key_proof: CKeyownershipProof =
+            match CKeyownershipProof::deserialize_compressed(key_proof.as_slice()) {
+                Ok(v) => v,
+                Err(e) => return Err(error(format!("key_proof error: {:?}", e))),
+            };
+        let res =
+            CCardProtocol::verify_key_ownership(&params, &pub_key, &memo.to_vec(), &key_proof)
+                .is_ok();
 
         let cost = gasometer.used_gas();
         let logs = vec![];
@@ -305,6 +314,7 @@ impl ZkCard {
             &shuffle_proof,
         )
         .is_ok();
+
         let cost = gasometer.used_gas();
         let logs = vec![];
 
