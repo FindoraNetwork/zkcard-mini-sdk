@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
+use std::collections::VecDeque;
+
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use ark_std::{UniformRand, Zero};
@@ -193,7 +195,7 @@ pub fn shuffleAndRemask(
     )
     .map(|v| {
         console::log_1(&"shuffleAndRemask success".to_string().into());
-        let deck: Vec<MaskedCard> = v.0.iter().map(|v| MaskedCard { v: v.clone() }).collect();
+        let deck: VecDeque<MaskedCard> = v.0.iter().map(|v| MaskedCard { v: v.clone() }).collect();
         let vdeck = VMaskedCard { v: deck };
         let shuffleProof = ShuffleProof { v: v.1 };
         MaskedCardsAndShuffleProof {
@@ -401,29 +403,24 @@ pub struct MaskedCard {
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct VMaskedCard {
-    v: Vec<MaskedCard>,
+    v: VecDeque<MaskedCard>,
 }
 
 #[wasm_bindgen]
 impl VMaskedCard {
     #[wasm_bindgen]
     pub fn newVMaskedCard() -> Self {
-        return Self { v: Vec::new() };
+        return Self { v: VecDeque::new() };
     }
 
     #[wasm_bindgen]
     pub fn push(&mut self, d: &MaskedCard) {
-        self.v.push(d.clone());
+        self.v.push_back(d.clone());
     }
 
     #[wasm_bindgen]
     pub fn pop(&mut self) -> MaskedCard {
-        self.v.pop().unwrap()
-    }
-
-    #[wasm_bindgen]
-    pub fn reverse(&mut self) {
-        self.v.reverse();
+        self.v.pop_front().unwrap()
     }
 
     #[wasm_bindgen]
