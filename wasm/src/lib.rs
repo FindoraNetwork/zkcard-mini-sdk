@@ -8,6 +8,7 @@ use ark_serialize::CanonicalSerialize;
 use ark_std::{UniformRand, Zero};
 use barnett_smart_card_protocol::Reveal;
 use rand::{rngs::ThreadRng, thread_rng};
+use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
 use web_sys::console;
@@ -289,7 +290,7 @@ pub fn encodeCards(cardrand: &mut CardRand, num: usize) -> VCard {
     //     }
     // }
 
-    let vcard: Vec<Card> = plaintexts.iter().map(|v| Card { v: v.clone() }).collect();
+    let vcard: VecDeque<Card> = plaintexts.iter().map(|v| Card { v: v.clone() }).collect();
 
     VCard { v: vcard }
 
@@ -377,19 +378,38 @@ pub struct Card {
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct VCard {
-    v: Vec<Card>,
+    v: VecDeque<Card>,
 }
 
 #[wasm_bindgen]
 impl VCard {
     #[wasm_bindgen]
     pub fn newVCard() -> Self {
-        return Self { v: Vec::new() };
+        return Self { v: VecDeque::new() };
+    }
+
+    #[wasm_bindgen]
+    pub fn len(&self) -> usize {
+        self.v.len()
     }
 
     #[wasm_bindgen]
     pub fn push(&mut self, d: &Card) {
-        self.v.push(d.clone());
+        self.v.push_back(d.clone());
+    }
+
+    #[wasm_bindgen]
+    pub fn pop(&mut self) -> Card {
+        self.v.pop_front().unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> Box<[JsValue]> {
+        let mut vs: Vec<JsValue> = Vec::new();
+        for v in &self.v {
+            vs.push(to_value(&v.serialAndEnbase64()).unwrap());
+        }
+        vs.into_boxed_slice()
     }
 }
 
@@ -426,6 +446,15 @@ impl VMaskedCard {
     #[wasm_bindgen]
     pub fn len(&self) -> usize {
         self.v.len()
+    }
+
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> Box<[JsValue]> {
+        let mut vs: Vec<JsValue> = Vec::new();
+        for v in &self.v {
+            vs.push(to_value(&v.serialAndEnbase64()).unwrap());
+        }
+        vs.into_boxed_slice()
     }
 }
 
@@ -464,18 +493,37 @@ pub struct RevealToken {
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct VRevealToken {
-    v: Vec<RevealToken>,
+    v: VecDeque<RevealToken>,
 }
 
 #[wasm_bindgen]
 impl VRevealToken {
     pub fn newVRevealToken() -> Self {
-        return Self { v: Vec::new() };
+        return Self { v: VecDeque::new() };
+    }
+
+    #[wasm_bindgen]
+    pub fn len(&self) -> usize {
+        self.v.len()
     }
 
     #[wasm_bindgen]
     pub fn push(&mut self, d: &RevealToken) {
-        self.v.push(d.clone());
+        self.v.push_back(d.clone());
+    }
+
+    #[wasm_bindgen]
+    pub fn pop(&mut self) -> RevealToken {
+        self.v.pop_front().unwrap()
+    }
+
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> Box<[JsValue]> {
+        let mut vs: Vec<JsValue> = Vec::new();
+        for v in &self.v {
+            vs.push(to_value(&v.serialAndEnbase64()).unwrap());
+        }
+        vs.into_boxed_slice()
     }
 }
 
