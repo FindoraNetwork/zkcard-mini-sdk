@@ -144,7 +144,7 @@ pub fn keygen(
 pub fn mask(
     cardrand: &mut CardRand,
     parameters: &CardParameters,
-    sharedKey: &PublicKey,
+    sharedKey: &AggregatePublicKey,
     encoded: &Card,
 ) -> Result<MaskedCard, JsValue> {
     let rng = &mut cardrand.v;
@@ -175,7 +175,7 @@ pub fn mask(
 pub fn shuffleAndRemask(
     cardrand: &mut CardRand,
     parameters: &CardParameters,
-    sharedKey: &PublicKey,
+    sharedKey: &AggregatePublicKey,
     deck: &VMaskedCard,
     permutation: &Permutation,
 ) -> Result<MaskedCardsAndShuffleProof, JsValue> {

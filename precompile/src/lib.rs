@@ -226,7 +226,7 @@ impl ZkCard {
 
         let pub_keys = input.read::<Vec<Bytes>>()?;
 
-        let mut aggregate_pub_key = CPublicKey::zero();
+        let mut aggregate_pub_key = CAggregatePublicKey::zero();
         for v_pub_key in pub_keys {
             let v_pub_key: CPublicKey =
                 match CanonicalDeserialize::deserialize_compressed(v_pub_key.as_slice()) {
