@@ -40,7 +40,7 @@ type CConfig = Config;
 type CProjective<T> = Projective<T>;
 type CCurve = G1Projective;
 type CCardProtocol<'a> = DLCards<'a, CCurve>;
-type CParameters = Parameters<CProjective<CConfig>>;
+type CCardParameters = Parameters<CProjective<CConfig>>;
 type CPublicKey = Affine<CConfig>;
 type CMaskedCard = InMaskedCard<CCurve>;
 type CRevealToken = InRevealToken<CCurve>;
@@ -314,7 +314,7 @@ impl CardRand {
 // Public parameters of the game
 #[wasm_bindgen]
 pub struct CardParameters {
-    v: CParameters,
+    v: CCardParameters,
 }
 
 // A game public key
@@ -399,17 +399,17 @@ impl VCard {
     }
 
     #[wasm_bindgen]
-    pub fn pop(&mut self) -> Card {
-        self.v.pop_front().unwrap()
+    pub fn pop(&mut self) -> Result<Card, JsValue> {
+        self.v.pop_front().ok_or(JsValue::from("pop err!!!"))
     }
 
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> Box<[JsValue]> {
+    pub fn serialAndEnbase64(&self) -> Result<Box<[JsValue]>, JsValue> {
         let mut vs: Vec<JsValue> = Vec::new();
         for v in &self.v {
-            vs.push(to_value(&v.serialAndEnbase64()).unwrap());
+            vs.push(to_value(&v.serialAndEnbase64()?)?);
         }
-        vs.into_boxed_slice()
+        Ok(vs.into_boxed_slice())
     }
 }
 
@@ -439,8 +439,8 @@ impl VMaskedCard {
     }
 
     #[wasm_bindgen]
-    pub fn pop(&mut self) -> MaskedCard {
-        self.v.pop_front().unwrap()
+    pub fn pop(&mut self) -> Result<MaskedCard, JsValue> {
+        self.v.pop_front().ok_or(JsValue::from("pop err!!!"))
     }
 
     #[wasm_bindgen]
@@ -449,12 +449,12 @@ impl VMaskedCard {
     }
 
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> Box<[JsValue]> {
+    pub fn serialAndEnbase64(&self) -> Result<Box<[JsValue]>, JsValue> {
         let mut vs: Vec<JsValue> = Vec::new();
         for v in &self.v {
-            vs.push(to_value(&v.serialAndEnbase64()).unwrap());
+            vs.push(to_value(&v.serialAndEnbase64()?)?);
         }
-        vs.into_boxed_slice()
+        Ok(vs.into_boxed_slice())
     }
 }
 
@@ -513,17 +513,17 @@ impl VRevealToken {
     }
 
     #[wasm_bindgen]
-    pub fn pop(&mut self) -> RevealToken {
-        self.v.pop_front().unwrap()
+    pub fn pop(&mut self) -> Result<RevealToken, JsValue> {
+        self.v.pop_front().ok_or(JsValue::from("pop err!!!"))
     }
 
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> Box<[JsValue]> {
+    pub fn serialAndEnbase64(&self) -> Result<Box<[JsValue]>, JsValue> {
         let mut vs: Vec<JsValue> = Vec::new();
         for v in &self.v {
-            vs.push(to_value(&v.serialAndEnbase64()).unwrap());
+            vs.push(to_value(&v.serialAndEnbase64()?)?);
         }
-        vs.into_boxed_slice()
+        Ok(vs.into_boxed_slice())
     }
 }
 
@@ -571,102 +571,126 @@ impl Permutation {
 #[wasm_bindgen]
 impl CardParameters {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return CardParameters { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<CardParameters, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl PublicKey {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<PublicKey, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl SecretKey {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<SecretKey, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl KeyownershipProof {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<KeyownershipProof, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl AggregatePublicKey {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<AggregatePublicKey, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl Card {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<Card, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
@@ -680,67 +704,83 @@ impl MaskedCard {
     }
 
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<MaskedCard, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl ShuffleProof {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<ShuffleProof, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl RevealToken {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<RevealToken, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }
 
 #[wasm_bindgen]
 impl RevealProof {
     #[wasm_bindgen]
-    pub fn serialAndEnbase64(&self) -> String {
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
         let mut data = Vec::with_capacity(self.v.compressed_size());
-        self.v.serialize_compressed(&mut data).unwrap();
-        return base64::encode(data);
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
     }
 
     #[wasm_bindgen]
-    pub fn debase64AndDeserial(data: &str) -> Self {
-        let data = base64::decode(data).unwrap();
-        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice()).unwrap();
-        return Self { v };
+    pub fn debase64AndDeserial(data: &str) -> Result<RevealProof, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
     }
 }

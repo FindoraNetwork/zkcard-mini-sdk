@@ -44,7 +44,7 @@ type CConfig = Config;
 type CProjective<T> = Projective<T>;
 type CCurve = G1Projective;
 type CCardProtocol<'a> = DLCards<'a, CCurve>;
-type CParameters = Parameters<CProjective<CConfig>>;
+type CCardParameters = Parameters<CProjective<CConfig>>;
 type CPublicKey = Affine<CConfig>;
 type CMaskedCard = InMaskedCard<CCurve>;
 type CRevealToken = InRevealToken<CCurve>;
@@ -181,10 +181,11 @@ impl ZkCard {
         let memo = input.read::<Bytes>()?;
         let key_proof = input.read::<Bytes>()?;
 
-        let params: CParameters = match CParameters::deserialize_compressed(params.as_slice()) {
-            Ok(v) => v,
-            Err(e) => return Err(error(format!("params error: {:?}", e))),
-        };
+        let params: CCardParameters =
+            match CCardParameters::deserialize_compressed(params.as_slice()) {
+                Ok(v) => v,
+                Err(e) => return Err(error(format!("params error: {:?}", e))),
+            };
         let pub_key: CPublicKey = match CPublicKey::deserialize_compressed(pub_key.as_slice()) {
             Ok(v) => v,
             Err(e) => return Err(error(format!("pub_key error: {:?}", e))),
@@ -273,7 +274,7 @@ impl ZkCard {
         let new_decks = input.read::<Vec<Bytes>>()?;
         let shuffle_proof = input.read::<Bytes>()?;
 
-        let params: CParameters =
+        let params: CCardParameters =
             match CanonicalDeserialize::deserialize_compressed(params.as_slice()) {
                 Ok(v) => v,
                 Err(e) => return Err(error(format!("params error: {:?}", e))),
@@ -344,7 +345,7 @@ impl ZkCard {
         let masked = input.read::<Bytes>()?;
         let reveal_proof = input.read::<Bytes>()?;
 
-        let params: CParameters =
+        let params: CCardParameters =
             match CanonicalDeserialize::deserialize_compressed(params.as_slice()) {
                 Ok(v) => v,
                 Err(e) => return Err(error(format!("params error: {:?}", e))),
