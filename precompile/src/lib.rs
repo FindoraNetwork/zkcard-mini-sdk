@@ -22,6 +22,7 @@ use ark_ec::{
     AffineRepr,
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::One;
 use barnett_smart_card_protocol::{
     discrete_log_cards::{
         DLCards, MaskedCard as InMaskedCard, Parameters, RevealToken as InRevealToken,
@@ -29,7 +30,7 @@ use barnett_smart_card_protocol::{
     BarnettSmartProtocol, Reveal,
 };
 use proof_essentials::{
-    homomorphic_encryption::el_gamal::ElGamal,
+    homomorphic_encryption::el_gamal::{ElGamal, Plaintext},
     vector_commitment::pedersen::PedersenCommitment,
     zkp::{
         arguments::shuffle::proof::Proof as InShuffleProof,
@@ -52,6 +53,8 @@ type CAggregatePublicKey = G1Affine;
 type CRevealProof = InRevealProof<CCurve>;
 type CShuffleProof = InShuffleProof<Fr, ElGamal<CCurve>, PedersenCommitment<CCurve>>;
 type CKeyownershipProof = InKeyownershipProof<CProjective<CConfig>>;
+type CCard = Plaintext<CProjective<CConfig>>;
+type CScalar = Fr;
 
 /// ZkCard transfer event selector, Keccak256("Transfer(address,address,uint256)")
 ///
@@ -98,6 +101,7 @@ pub enum Call {
     ComputeAggregateKey = "computeAggregateKey(bytes[])",
     VerifyShuffle = "verifyShuffle(bytes,bytes,bytes[],bytes[],bytes)",
     Reveal = "reveal(bytes[],bytes)",
+    Mask = "mask(bytes,bytes,bytes)",
     Test = "test(bytes,bytes[])",
 }
 
@@ -122,6 +126,7 @@ impl Precompile for ZkCard {
                 Call::VerifyShuffle => Self::verify_shuffle(input, target_gas),
                 Call::VerifyReveal => Self::verify_reveal(input, target_gas),
                 Call::Reveal => Self::reveal(input, target_gas),
+                Call::Mask => Self::mask(input, target_gas),
                 Call::Test => Self::test(input, target_gas),
             }
         } {
@@ -425,6 +430,63 @@ impl ZkCard {
 
         let mut res = Vec::with_capacity(decrypted.compressed_size());
         match decrypted.serialize_compressed(&mut res) {
+            Ok(v) => v,
+            Err(e) => return Err(error(format!("serialize error: {:?}", e))),
+        };
+
+        let res = base64::encode(&res).into_bytes();
+        let res: Bytes = res.to_bytes();
+
+        let cost = gasometer.used_gas();
+        let logs = vec![];
+
+        Ok((
+            PrecompileOutput {
+                exit_status: ExitSucceed::Returned,
+                output: EvmDataWriter2::new().write(res).build(),
+            },
+            cost,
+            logs,
+        ))
+    }
+
+    fn mask(
+        mut input: EvmDataReader2,
+        target_gas: Option<u64>,
+    ) -> EvmResult<(PrecompileOutput, u64, Vec<Log>)> {
+        let mut gasometer = Gasometer::new(target_gas);
+        gasometer.record_cost(GAS_REVEAL)?;
+
+        input.expect_arguments(2)?;
+
+        let params = input.read::<Bytes>()?;
+        let shared_key = input.read::<Bytes>()?;
+        let encoded = input.read::<Bytes>()?;
+
+        let params: CCardParameters =
+            match CanonicalDeserialize::deserialize_compressed(params.as_slice()) {
+                Ok(v) => v,
+                Err(e) => return Err(error(format!("reveal_token error: {:?}", e))),
+            };
+        let shared_key: CAggregatePublicKey =
+            match CanonicalDeserialize::deserialize_compressed(shared_key.as_slice()) {
+                Ok(v) => v,
+                Err(e) => return Err(error(format!("masked error: {:?}", e))),
+            };
+        let encoded: CCard = match CanonicalDeserialize::deserialize_compressed(encoded.as_slice())
+        {
+            Ok(v) => v,
+            Err(e) => return Err(error(format!("reveal_proof error: {:?}", e))),
+        };
+
+        let masked: CMaskedCard = match CCardProtocol::mask_only(&params, &shared_key, &encoded, &CScalar::one())
+        {
+            Ok(v) => v,
+            Err(e) => return Err(error(format!("mask error: {:?}", e))),
+        };
+
+        let mut res = Vec::with_capacity(masked.compressed_size());
+        match masked.serialize_compressed(&mut res) {
             Ok(v) => v,
             Err(e) => return Err(error(format!("serialize error: {:?}", e))),
         };

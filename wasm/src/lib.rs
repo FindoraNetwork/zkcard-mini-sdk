@@ -48,10 +48,10 @@ type CAggregatePublicKey = G1Affine;
 type CRevealProof = InRevealProof<CCurve>;
 type CShuffleProof = InShuffleProof<Fr, ElGamal<CCurve>, PedersenCommitment<CCurve>>;
 type CKeyownershipProof = InKeyownershipProof<CProjective<CConfig>>;
+type CCard = Plaintext<CProjective<CConfig>>;
+type CScalar = Fr;
 
 type CSecretKey = Fp<MontBackend<FrConfig, 4>, 4>;
-type CScalar = Fr;
-type CCard = Plaintext<CProjective<CConfig>>;
 
 #[derive(PartialEq, Clone, Copy, Eq)]
 pub enum Suite {
@@ -145,27 +145,19 @@ pub fn keygen(
 // @returns [MaskedCard}
 #[wasm_bindgen]
 pub fn mask(
-    cardrand: &mut CardRand,
     parameters: &CardParameters,
     sharedKey: &AggregatePublicKey,
     encoded: &Card,
 ) -> Result<MaskedCard, JsValue> {
-    let rng = &mut cardrand.v;
-    CCardProtocol::mask(
-        rng,
-        &parameters.v,
-        &sharedKey.v,
-        &encoded.v,
-        &CScalar::one(),
-    )
-    .map(|v| {
-        console::log_1(&"mask success".to_string().into());
-        MaskedCard { v: v.0 }
-    })
-    .map_err(|e| {
-        console::log_1(&format!("mask error: {:?}", e).into());
-        JsValue::from_str(&e.to_string())
-    })
+    CCardProtocol::mask_only(&parameters.v, &sharedKey.v, &encoded.v, &CScalar::one())
+        .map(|v| {
+            console::log_1(&"mask success".to_string().into());
+            MaskedCard { v: v }
+        })
+        .map_err(|e| {
+            console::log_1(&format!("mask error: {:?}", e).into());
+            JsValue::from_str(&e.to_string())
+        })
 }
 
 // Shuffle and remask the deck of cards with a random permutation

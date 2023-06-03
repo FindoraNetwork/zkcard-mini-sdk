@@ -1,13 +1,13 @@
-all: build wasm_release
+all: build wasm_node
 
 WASM_PKG = wasm.tar.gz
 lib_files = ./$(WASM_PKG)
 
-wasm_debug:
-	cd wasm && wasm-pack build --profiling
+wasm_node:
+	cd wasm && wasm-pack build --target nodejs
 
-wasm_release:
-	cd wasm && wasm-pack build
+wasm_web:
+	cd wasm && wasm-pack build --target web
 
 wasm_pack:
 	- tar -zcpf $(WASM_PKG) wasm/pkg

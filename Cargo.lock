@@ -298,7 +298,7 @@ dependencies = [
 [[package]]
 name = "barnett-smart-card-protocol"
 version = "0.2.0"
-source = "git+https://github.com/FindoraNetwork/findora-poker.git?branch=add_only_function#79550f87ad8a833ab64793fae9cbbd707dd6f773"
+source = "git+https://github.com/FindoraNetwork/findora-poker.git?branch=add_only_function#01476a06aafecc11fbd4b1c27c1fcd5f452a489c"
 dependencies = [
  "anyhow",
  "ark-ec",
@@ -2215,7 +2215,7 @@ dependencies = [
 [[package]]
 name = "proof-essentials"
 version = "0.2.0"
-source = "git+https://github.com/FindoraNetwork/findora-poker.git?branch=add_only_function#79550f87ad8a833ab64793fae9cbbd707dd6f773"
+source = "git+https://github.com/FindoraNetwork/findora-poker.git?branch=add_only_function#01476a06aafecc11fbd4b1c27c1fcd5f452a489c"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -2229,6 +2229,7 @@ dependencies = [
  "merlin 3.0.0",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "serde",
  "thiserror",
 ]
 
