@@ -106,7 +106,7 @@ pub fn setup(cardrand: &mut CardRand, m: usize, n: usize) -> Result<CardParamete
 pub fn keygen(
     cardrand: &mut CardRand,
     parameters: &CardParameters,
-    name: String,
+    name: &PlayerName,
 ) -> Result<GameKeyAndProof, JsValue> {
     let rng = &mut cardrand.v;
     let v = match CCardProtocol::player_keygen(rng, &parameters.v) {
@@ -123,19 +123,25 @@ pub fn keygen(
     let pubKey = PublicKey { v: v.0 };
     let secKey = SecretKey { v: v.1 };
 
-    CCardProtocol::prove_key_ownership(rng, &parameters.v, &v.0, &v.1, &name.as_bytes().to_owned())
-        .map(|v| {
-            console::log_1(&"keygen success".to_string().into());
-            GameKeyAndProof {
-                pubKey: pubKey,
-                secKey: secKey,
-                keyownershipProof: KeyownershipProof { v },
-            }
-        })
-        .map_err(|e| {
-            console::log_1(&format!("keygen error: {:?}", e).into());
-            JsValue::from_str(&e.to_string())
-        })
+    CCardProtocol::prove_key_ownership(
+        rng,
+        &parameters.v,
+        &v.0,
+        &v.1,
+        &name.v.as_bytes().to_owned(),
+    )
+    .map(|v| {
+        console::log_1(&"keygen success".to_string().into());
+        GameKeyAndProof {
+            pubKey: pubKey,
+            secKey: secKey,
+            keyownershipProof: KeyownershipProof { v },
+        }
+    })
+    .map_err(|e| {
+        console::log_1(&format!("keygen error: {:?}", e).into());
+        JsValue::from_str(&e.to_string())
+    })
 }
 
 // Mask encoded cards as masked cards
@@ -287,6 +293,39 @@ pub fn encodeCards(cardrand: &mut CardRand, num: usize) -> VCard {
     VCard { v: vcard }
 
     // (plaintexts, map)
+}
+
+#[wasm_bindgen]
+pub struct PlayerName {
+    v: String,
+}
+
+#[wasm_bindgen]
+impl PlayerName {
+    #[wasm_bindgen]
+    pub fn NewPlayerName(name: &str) -> Self {
+        Self {
+            v: name.to_string(),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> Result<String, JsValue> {
+        let mut data = Vec::with_capacity(self.v.compressed_size());
+        self.v
+            .serialize_compressed(&mut data)
+            .map_err(|e| JsValue::from(&format!("serialAndEnbase64 err: {:?}", e)))?;
+        Ok(base64::encode(data))
+    }
+
+    #[wasm_bindgen]
+    pub fn debase64AndDeserial(data: &str) -> Result<PlayerName, JsValue> {
+        let data = base64::decode(data)
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err1: {:?}", e)))?;
+        let v = CanonicalDeserialize::deserialize_compressed(data.as_slice())
+            .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
+        Ok(Self { v })
+    }
 }
 
 #[wasm_bindgen]

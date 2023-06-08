@@ -25,6 +25,7 @@ num_enum = { version = "0.5.4", default-features = false }
 slices = "0.2.0"
 rand = "0.8"
 base64 = "0.12"
+hex = "0.4.3"
 
 
 barnett-smart-card-protocol = { git = "https://github.com/FindoraNetwork/findora-poker.git", branch = "add_only_function" }
