@@ -12,6 +12,7 @@ use evm_precompile_utils::{
 };
 use num::Zero;
 use slices::u8_slice;
+use std::any::type_name;
 use std::vec;
 use tracing::debug;
 
@@ -112,12 +113,9 @@ impl Precompile for ZkCard {
         let _context = handle.context();
 
         let mut input = EvmDataReader2::new(input);
-        let selector = match input.read_selector::<Call>() {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(PrecompileFailure::Error { exit_status: e });
-            }
-        };
+        let selector = input
+            .read_selector::<Call>()
+            .map_err(|e| PrecompileFailure::Error { exit_status: e })?;
 
         match {
             match &selector {
@@ -420,16 +418,16 @@ impl ZkCard {
         }
         let masked: CMaskedCard = deserialize(masked.as_slice())?;
 
-        let decrypted = match aggregate_reveal_token.reveal(&masked) {
-            Ok(v) => {
+        let decrypted = aggregate_reveal_token
+            .reveal(&masked)
+            .map(|v| {
                 println!("reveal reveal ok: {:?}", v);
                 v
-            }
-            Err(e) => {
+            })
+            .map_err(|e| {
                 println!("reveal reveal err: {:?}", e);
-                return Err(error(format!("reveal reveal error: {:?}", e)));
-            }
-        };
+                error(format!("reveal reveal error: {:?}", e))
+            })?;
 
         let res = serialize(&decrypted)?;
         let res = base64::encode(&res).into_bytes();
@@ -472,16 +470,15 @@ impl ZkCard {
         let encoded: CCard = deserialize(encoded.as_slice())?;
 
         let masked: CMaskedCard =
-            match CCardProtocol::mask_only(&params, &shared_key, &encoded, &CScalar::one()) {
-                Ok(v) => {
+            CCardProtocol::mask_only(&params, &shared_key, &encoded, &CScalar::one())
+                .map(|v| {
                     println!("mask mask_only deserialize ok: {:?}", v);
                     v
-                }
-                Err(e) => {
+                })
+                .map_err(|e| {
                     println!("mask mask_only error: {:?}", e);
-                    return Err(error(format!("mask mask_only error: {:?}", e)));
-                }
-            };
+                    error(format!("mask mask_only error: {:?}", e))
+                })?;
 
         let res = serialize(&masked)?;
         let res = base64::encode(&res).into_bytes();
@@ -502,46 +499,41 @@ impl ZkCard {
 }
 
 fn deserialize<T: CanonicalDeserialize>(data: &[u8]) -> EvmResult<T> {
-    let typename1 = std::any::type_name::<T>();
-    match CanonicalDeserialize::deserialize_compressed(data) {
-        Ok(v) => {
+    let typename1 = type_name::<T>();
+    CanonicalDeserialize::deserialize_compressed(data)
+        .map(|v| {
             println!("{:?} deserialize ok: {:?}", typename1, data);
-            return Ok(v);
-        }
-        Err(e) => {
+            v
+        })
+        .map_err(|e| {
             println!("{:?} deserialize error: {:?}", typename1, e);
-            return Err(error(format!("{:?} deserialize error: {:?}", typename1, e)));
-        }
-    };
+            error(format!("{:?} deserialize error: {:?}", typename1, e))
+        })
 }
 
 fn serialize<T: CanonicalSerialize>(data: &T) -> EvmResult<Vec<u8>> {
-    let typename1 = std::any::type_name::<T>();
+    let typename1 = type_name::<T>();
     let mut res = Vec::with_capacity(data.compressed_size());
-    match data.serialize_compressed(&mut res) {
-        Ok(v) => {
+    data.serialize_compressed(&mut res)
+        .map(|v| {
             println!("{:?} serialize ok: {:?}", typename1, v);
-            return Ok(res);
-        }
-        Err(e) => {
+            res
+        })
+        .map_err(|e| {
             println!("{:?} serialize error: {:?}", typename1, e);
-            return Err(error(format!("{:?} serialize error: {:?}", typename1, e)));
-        }
-    };
+            error(format!("{:?} serialize error: {:?}", typename1, e))
+        })
 }
 
 fn debase64<T>(data: &[u8]) -> EvmResult<Vec<u8>> {
-    let typename1 = std::any::type_name::<T>();
-    match base64::decode(data) {
-        Ok(v) => {
+    let typename1 = type_name::<T>();
+    base64::decode(data)
+        .map(|v| {
             println!("{:?} debase64 ok: {:?}", typename1, data);
-            return Ok(v);
-        }
-        Err(e) => {
-            return {
-                println!("{:?} debase64 error: {:?}", typename1, e);
-                Err(error(format!("{:?} debase64 error: {:?}", typename1, e)))
-            }
-        }
-    };
+            v
+        })
+        .map_err(|e| {
+            println!("{:?} debase64 error: {:?}", typename1, e);
+            error(format!("{:?} debase64 error: {:?}", typename1, e))
+        })
 }

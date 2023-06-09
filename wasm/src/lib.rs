@@ -11,6 +11,8 @@ use rand::{rngs::ThreadRng, thread_rng};
 use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsValue;
+
+#[cfg(feature = "js_log")]
 use web_sys::console;
 
 use ark_bn254::{fr::FrConfig, g1::Config, Fr, G1Affine, G1Projective};
@@ -90,11 +92,17 @@ pub fn setup(cardrand: &mut CardRand, m: usize, n: usize) -> Result<CardParamete
     let rng = &mut cardrand.v;
     CCardProtocol::setup(rng, m, n)
         .map(|v| {
-            console::log_1(&"setup success".to_string().into());
-            CardParameters { v }
+            let v = CardParameters { v };
+
+            #[cfg(feature = "js_log")]
+            console::log_1(&format!("setup ok: {:?}", v.serialAndEnbase64()).into());
+
+            v
         })
         .map_err(|e| {
+            #[cfg(feature = "js_log")]
             console::log_1(&format!("setup error: {:?}", e).into());
+
             JsValue::from_str(&e.to_string())
         })
 }
@@ -109,16 +117,26 @@ pub fn keygen(
     name: &PlayerName,
 ) -> Result<GameKeyAndProof, JsValue> {
     let rng = &mut cardrand.v;
-    let v = match CCardProtocol::player_keygen(rng, &parameters.v) {
-        Ok(v) => {
-            console::log_1(&"keygen success".to_string().into());
+    let v = CCardProtocol::player_keygen(rng, &parameters.v)
+        .map(|v| {
+            #[cfg(feature = "js_log")]
+            console::log_1(
+                &format!(
+                    "keygen ok: PublicKey: {:?} SecretKey: {:?}",
+                    PublicKey { v: v.0 }.serialAndEnbase64(),
+                    SecretKey { v: v.1 }.serialAndEnbase64()
+                )
+                .into(),
+            );
+
             v
-        }
-        Err(e) => {
+        })
+        .map_err(|e| {
+            #[cfg(feature = "js_log")]
             console::log_1(&format!("keygen error: {:?}", e).into());
-            return Err(JsValue::from_str(&e.to_string()));
-        }
-    };
+
+            JsValue::from_str(&e.to_string())
+        })?;
 
     let pubKey = PublicKey { v: v.0 };
     let secKey = SecretKey { v: v.1 };
@@ -131,7 +149,9 @@ pub fn keygen(
         &name.v.as_bytes().to_owned(),
     )
     .map(|v| {
-        console::log_1(&"keygen success".to_string().into());
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("keygen ok: {:?}", v).into());
+
         GameKeyAndProof {
             pubKey: pubKey,
             secKey: secKey,
@@ -139,7 +159,9 @@ pub fn keygen(
         }
     })
     .map_err(|e| {
+        #[cfg(feature = "js_log")]
         console::log_1(&format!("keygen error: {:?}", e).into());
+
         JsValue::from_str(&e.to_string())
     })
 }
@@ -157,11 +179,15 @@ pub fn mask(
 ) -> Result<MaskedCard, JsValue> {
     CCardProtocol::mask_only(&parameters.v, &sharedKey.v, &encoded.v, &CScalar::one())
         .map(|v| {
-            console::log_1(&"mask success".to_string().into());
+            #[cfg(feature = "js_log")]
+            console::log_1(&format!("mask ok: {:?}", v).into());
+
             MaskedCard { v: v }
         })
         .map_err(|e| {
+            #[cfg(feature = "js_log")]
             console::log_1(&format!("mask error: {:?}", e).into());
+
             JsValue::from_str(&e.to_string())
         })
 }
@@ -193,17 +219,29 @@ pub fn shuffleAndRemask(
         &permutation.v,
     )
     .map(|v| {
-        console::log_1(&"shuffleAndRemask success".to_string().into());
         let deck: VecDeque<MaskedCard> = v.0.iter().map(|v| MaskedCard { v: v.clone() }).collect();
         let vdeck = VMaskedCard { v: deck };
         let shuffleProof = ShuffleProof { v: v.1 };
+
+        #[cfg(feature = "js_log")]
+        console::log_1(
+            &format!(
+                "shuffleAndRemask ok: VmaskedCard: {:?} ShuffleProof: {:?}",
+                vdeck.serialAndEnbase64(),
+                shuffleProof.serialAndEnbase64()
+            )
+            .into(),
+        );
+
         MaskedCardsAndShuffleProof {
             vmaskedCard: vdeck,
             shuffleProof,
         }
     })
     .map_err(|e| {
+        #[cfg(feature = "js_log")]
         console::log_1(&format!("shuffleAndRemask error: {:?}", e).into());
+
         JsValue::from_str(&e.to_string())
     })
 }
@@ -225,14 +263,18 @@ pub fn computeRevealToken(
     let rng = &mut cardrand.v;
     CCardProtocol::compute_reveal_token(rng, &parameters.v, &secretKey.v, &publicKey.v, &masked.v)
         .map(|v| {
-            console::log_1(&"computeRevealToken success".to_string().into());
+            #[cfg(feature = "js_log")]
+            console::log_1(&format!("computeRevealToken ok: {:?}", v).into());
+
             RevealTokenAndProof {
                 revealToken: RevealToken { v: v.0 },
                 revealProof: RevealProof { v: v.1 },
             }
         })
         .map_err(|e| {
+            #[cfg(feature = "js_log")]
             console::log_1(&format!("computeRevealToken error: {:?}", e).into());
+
             JsValue::from_str(&e.to_string())
         })
 }
@@ -251,9 +293,16 @@ pub fn reveal(revealTokens: VRevealToken, masked: &MaskedCard) -> Result<Card, J
 
     aggregate_token
         .reveal(&masked.v)
-        .map(|v| Card { v })
+        .map(|v| {
+            #[cfg(feature = "js_log")]
+            console::log_1(&format!("reveal ok: {:?}", v).into());
+
+            Card { v }
+        })
         .map_err(|e| {
+            #[cfg(feature = "js_log")]
             console::log_1(&format!("reveal error: {:?}", e).into());
+
             JsValue::from_str(&e.to_string())
         })
 }
