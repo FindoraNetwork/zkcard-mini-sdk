@@ -3,6 +3,7 @@
 
 use std::collections::VecDeque;
 
+use ark_ec::AffineRepr;
 use ark_serialize::CanonicalDeserialize;
 use ark_serialize::CanonicalSerialize;
 use ark_std::{UniformRand, Zero};
@@ -402,6 +403,43 @@ pub struct CardParameters {
 #[derive(Clone)]
 pub struct PublicKey {
     v: CPublicKey,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct VPublicKey {
+    v: VecDeque<PublicKey>,
+}
+
+#[wasm_bindgen]
+impl VPublicKey {
+    pub fn newVPublicKey() -> Self {
+        return Self { v: VecDeque::new() };
+    }
+
+    #[wasm_bindgen]
+    pub fn len(&self) -> usize {
+        self.v.len()
+    }
+
+    #[wasm_bindgen]
+    pub fn push(&mut self, d: &PublicKey) {
+        self.v.push_back(d.clone());
+    }
+
+    #[wasm_bindgen]
+    pub fn pop(&mut self) -> Result<PublicKey, JsValue> {
+        self.v.pop_front().ok_or(JsValue::from("pop err!!!"))
+    }
+
+    #[wasm_bindgen]
+    pub fn serialAndEnbase64(&self) -> Result<Box<[JsValue]>, JsValue> {
+        let mut vs: Vec<JsValue> = Vec::new();
+        for v in &self.v {
+            vs.push(to_value(&v.serialAndEnbase64()?)?);
+        }
+        Ok(vs.into_boxed_slice())
+    }
 }
 
 // A game secret key
@@ -863,4 +901,127 @@ impl RevealProof {
             .map_err(|e| JsValue::from(&format!("debase64AndDeserial err2: {:?}", e)))?;
         Ok(Self { v })
     }
+}
+
+#[wasm_bindgen]
+pub fn contract_verify_key_ownership_mock(
+    params: &CardParameters,
+    pub_key: &PublicKey,
+    name: &PlayerName,
+    key_proof: &KeyownershipProof,
+) -> Result<bool, JsValue> {
+    let res = CCardProtocol::verify_key_ownership(
+        &params.v,
+        &pub_key.v,
+        &name.v.as_bytes().to_owned(),
+        &key_proof.v,
+    )
+    .map(|v| {
+        println!("verify_key_ownership verify_key_ownership ok: {:?}", v);
+        v
+    })
+    .map_err(|e| {
+        println!("verify_key_ownership verify_key_ownership err: {:?}", e);
+        e
+    })
+    .is_ok();
+
+    Ok(res)
+}
+
+#[wasm_bindgen]
+pub fn contract_compute_aggregate_key_mock(
+    pub_keys: &VPublicKey,
+) -> Result<AggregatePublicKey, JsValue> {
+    let mut pub_keys2: Vec<CPublicKey> = Vec::new();
+    for v_pub_key in &pub_keys.v {
+        pub_keys2.push(v_pub_key.v)
+    }
+
+    let mut aggregate_pub_key = CAggregatePublicKey::zero();
+    for v_pub_key in pub_keys2 {
+        aggregate_pub_key = (aggregate_pub_key + v_pub_key).into();
+    }
+
+    let res = AggregatePublicKey {
+        v: aggregate_pub_key,
+    };
+
+    Ok(res)
+}
+
+#[wasm_bindgen]
+pub fn contract_verify_shuffle_mock(
+    params: &CardParameters,
+    shared_key: &PublicKey,
+    cur_decks: &VMaskedCard,
+    new_decks: &VMaskedCard,
+    shuffle_proof: &ShuffleProof,
+) -> Result<bool, JsValue> {
+    let cur_decks: Vec<CMaskedCard> = cur_decks.v.iter().map(|v| v.v).collect();
+    let new_decks: Vec<CMaskedCard> = new_decks.v.iter().map(|v| v.v).collect();
+
+    let res = CCardProtocol::verify_shuffle(
+        &params.v,
+        &shared_key.v,
+        &cur_decks,
+        &new_decks,
+        &shuffle_proof.v,
+    )
+    .map(|v| {
+        println!("verify_shuffle verify_shuffle ok: {:?}", v);
+        v
+    })
+    .map_err(|e| {
+        println!("verify_shuffle verify_shuffle err: {:?}", e);
+        e
+    })
+    .is_ok();
+
+    Ok(res)
+}
+
+#[wasm_bindgen]
+pub fn contract_verify_reveal_mock(
+    params: &CardParameters,
+    pub_key: &PublicKey,
+    reveal_token: &RevealToken,
+    masked: &MaskedCard,
+    reveal_proof: &RevealProof,
+) -> Result<bool, JsValue> {
+    let res = CCardProtocol::verify_reveal(
+        &params.v,
+        &pub_key.v,
+        &reveal_token.v,
+        &masked.v,
+        &reveal_proof.v,
+    )
+    .map(|v| {
+        println!("verify_reveal verify_reveal ok: {:?}", v);
+        v
+    })
+    .map_err(|e| {
+        println!("verify_reveal verify_reveal err: {:?}", e);
+        e
+    })
+    .is_ok();
+
+    Ok(res)
+}
+
+#[wasm_bindgen]
+pub fn contract_reveal_mock(
+    revealTokens: VRevealToken,
+    masked: &MaskedCard,
+) -> Result<Card, JsValue> {
+    reveal(revealTokens, masked)
+}
+
+#[wasm_bindgen]
+pub fn contract_mask_mock(
+    params: &CardParameters,
+    shared_key: &AggregatePublicKey,
+    encoded: &Card,
+) -> Result<MaskedCard, JsValue> {
+    mask(params, shared_key, &encoded)
 }
