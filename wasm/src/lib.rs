@@ -285,11 +285,11 @@ pub fn computeRevealToken(
 // Qparam [MaskedCard}- A masked card
 // @returns [MaskedCard]
 #[wasm_bindgen]
-pub fn reveal(revealTokens: VRevealToken, masked: &MaskedCard) -> Result<Card, JsValue> {
+pub fn reveal(revealTokens: &VRevealToken, masked: &MaskedCard) -> Result<Card, JsValue> {
     let zero = CRevealToken::zero();
     let mut aggregate_token = zero;
-    for revealToken in revealTokens.v {
-        aggregate_token = aggregate_token + revealToken.v;
+    for revealToken in &revealTokens.v {
+        aggregate_token = aggregate_token + revealToken.v.clone();
     }
 
     aggregate_token
@@ -1011,7 +1011,7 @@ pub fn contract_verify_reveal_mock(
 
 #[wasm_bindgen]
 pub fn contract_reveal_mock(
-    revealTokens: VRevealToken,
+    revealTokens: &VRevealToken,
     masked: &MaskedCard,
 ) -> Result<Card, JsValue> {
     reveal(revealTokens, masked)
