@@ -917,11 +917,13 @@ pub fn contract_verify_key_ownership_mock(
         &key_proof.v,
     )
     .map(|v| {
-        println!("verify_key_ownership verify_key_ownership ok: {:?}", v);
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("verify_key_ownership verify_key_ownership ok: {:?}", v).into());
         v
     })
     .map_err(|e| {
-        println!("verify_key_ownership verify_key_ownership err: {:?}", e);
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("verify_key_ownership verify_key_ownership err: {:?}", e).into());
         e
     })
     .is_ok();
@@ -953,7 +955,7 @@ pub fn contract_compute_aggregate_key_mock(
 #[wasm_bindgen]
 pub fn contract_verify_shuffle_mock(
     params: &CardParameters,
-    shared_key: &PublicKey,
+    shared_key: &AggregatePublicKey,
     cur_decks: &VMaskedCard,
     new_decks: &VMaskedCard,
     shuffle_proof: &ShuffleProof,
@@ -969,11 +971,13 @@ pub fn contract_verify_shuffle_mock(
         &shuffle_proof.v,
     )
     .map(|v| {
-        println!("verify_shuffle verify_shuffle ok: {:?}", v);
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("verify_shuffle verify_shuffle ok: {:?}", v).into());
         v
     })
     .map_err(|e| {
-        println!("verify_shuffle verify_shuffle err: {:?}", e);
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("verify_shuffle verify_shuffle err: {:?}", e).into());
         e
     })
     .is_ok();
@@ -997,11 +1001,13 @@ pub fn contract_verify_reveal_mock(
         &reveal_proof.v,
     )
     .map(|v| {
-        println!("verify_reveal verify_reveal ok: {:?}", v);
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("verify_reveal verify_reveal ok: {:?}", v).into());
         v
     })
     .map_err(|e| {
-        println!("verify_reveal verify_reveal err: {:?}", e);
+        #[cfg(feature = "js_log")]
+        console::log_1(&format!("verify_reveal verify_reveal err: {:?}", e).into());
         e
     })
     .is_ok();
